@@ -1,0 +1,363 @@
+{
+  "entities": {
+    "StaffUser": {
+      "title": "StaffUser",
+      "description": "DMS staff account with role-based portal credentials",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "username": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "password": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "email": { "type": "string", "maxLength": 160 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "role": {
+          "type": "string",
+          "enum": ["ADMIN", "CASHIER", "WAREHOUSE_MANAGER", "SALES_REP", "DELIVERYMAN"]
+        },
+        "active": { "type": "boolean" },
+        "territory": { "type": "string", "maxLength": 120 },
+        "vehicleNo": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "username", "password", "name", "email", "phone", "role", "active"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Catalog SKU with pricing and 3-bucket inventory ledger counts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sku": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "category": { "type": "string", "maxLength": 80 },
+        "unit": { "type": "string", "maxLength": 40 },
+        "unitCost": { "type": "number" },
+        "sellingPrice": { "type": "number" },
+        "sellableStock": { "type": "number" },
+        "inTransitStock": { "type": "number" },
+        "damagedStock": { "type": "number" }
+      },
+      "required": [
+        "id",
+        "sku",
+        "name",
+        "category",
+        "unit",
+        "unitCost",
+        "sellingPrice",
+        "sellableStock",
+        "inTransitStock",
+        "damagedStock"
+      ]
+    },
+    "RetailStore": {
+      "title": "RetailStore",
+      "description": "Retail store profile with GPS coordinates and outstanding due balance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "ownerName": { "type": "string", "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "address": { "type": "string", "maxLength": 300 },
+        "zone": { "type": "string", "maxLength": 80 },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "creditBalance": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "name", "ownerName", "phone", "address", "zone", "creditBalance", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Sales order and delivery fulfillment lifecycle document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "orderNumber": { "type": "string", "maxLength": 64 },
+        "storeId": { "type": "string", "maxLength": 128 },
+        "storeName": { "type": "string", "maxLength": 160 },
+        "salesRepId": { "type": "string", "maxLength": 128 },
+        "salesRepName": { "type": "string", "maxLength": 120 },
+        "deliverymanId": { "type": "string", "maxLength": 128 },
+        "deliverymanName": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "dispatchedAt": { "type": "string", "maxLength": 64 },
+        "deliveredAt": { "type": "string", "maxLength": 64 },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING_DISPATCH", "IN_TRANSIT", "DELIVERED", "PARTIAL_DELIVERY"]
+        },
+        "items": { "type": "array" },
+        "totalOrderedAmount": { "type": "number" },
+        "returnCreditAmount": { "type": "number" },
+        "netPayableAmount": { "type": "number" },
+        "cashCollected": { "type": "number" },
+        "dueAdded": { "type": "number" },
+        "reconciled": { "type": "boolean" },
+        "cashSettled": { "type": "boolean" },
+        "finalInvoiceId": { "type": "string", "maxLength": 128 },
+        "finalInvoiceNumber": { "type": "string", "maxLength": 64 }
+      },
+      "required": [
+        "id",
+        "orderNumber",
+        "storeId",
+        "storeName",
+        "salesRepId",
+        "salesRepName",
+        "createdAt",
+        "status",
+        "items",
+        "totalOrderedAmount",
+        "returnCreditAmount",
+        "netPayableAmount",
+        "cashCollected",
+        "dueAdded",
+        "reconciled",
+        "cashSettled"
+      ]
+    },
+    "GRNRecord": {
+      "title": "GRNRecord",
+      "description": "Inbound manufacturer stock receipt with supplier invoice photo",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "referenceNo": { "type": "string", "maxLength": 80 },
+        "supplierName": { "type": "string", "maxLength": 160 },
+        "receivedAt": { "type": "string", "maxLength": 64 },
+        "receivedBy": { "type": "string", "maxLength": 120 },
+        "items": { "type": "array" },
+        "totalValue": { "type": "number" },
+        "invoiceImageDataUrl": { "type": "string", "maxLength": 600000 },
+        "invoiceImageName": { "type": "string", "maxLength": 160 }
+      },
+      "required": ["id", "referenceNo", "supplierName", "receivedAt", "receivedBy", "items", "totalValue"]
+    },
+    "ReconciliationRecord": {
+      "title": "ReconciliationRecord",
+      "description": "Warehouse route return reconciliation log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "deliverymanId": { "type": "string", "maxLength": 128 },
+        "deliverymanName": { "type": "string", "maxLength": 120 },
+        "reconciledAt": { "type": "string", "maxLength": 64 },
+        "reconciledBy": { "type": "string", "maxLength": 120 },
+        "orderIds": { "type": "array" },
+        "finalInvoiceId": { "type": "string", "maxLength": 128 },
+        "finalInvoiceNumber": { "type": "string", "maxLength": 64 },
+        "items": { "type": "array" }
+      },
+      "required": [
+        "id",
+        "deliverymanId",
+        "deliverymanName",
+        "reconciledAt",
+        "reconciledBy",
+        "orderIds",
+        "finalInvoiceId",
+        "finalInvoiceNumber",
+        "items"
+      ]
+    },
+    "FinalInvoice": {
+      "title": "FinalInvoice",
+      "description": "Final route invoice issued from Warehouse to Cashier Portal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "invoiceNumber": { "type": "string", "maxLength": 64 },
+        "reconciliationId": { "type": "string", "maxLength": 128 },
+        "deliverymanId": { "type": "string", "maxLength": 128 },
+        "deliverymanName": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "createdBy": { "type": "string", "maxLength": 120 },
+        "orders": { "type": "array" },
+        "items": { "type": "array" },
+        "totalOrderedAmount": { "type": "number" },
+        "totalDeliveredAmount": { "type": "number" },
+        "totalReturnCredit": { "type": "number" },
+        "netFinalPayable": { "type": "number" },
+        "expectedCashFromWarehouse": { "type": "number" },
+        "cashSettled": { "type": "boolean" },
+        "cashReceivedByCashier": { "type": "number" },
+        "variance": { "type": "number" },
+        "settledAt": { "type": "string", "maxLength": 64 },
+        "settledBy": { "type": "string", "maxLength": 120 },
+        "settlementDueDateKey": { "type": "string", "maxLength": 32 },
+        "rescheduledReason": { "type": "string", "maxLength": 240 },
+        "rescheduledBy": { "type": "string", "maxLength": 120 },
+        "rescheduledAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": [
+        "id",
+        "invoiceNumber",
+        "reconciliationId",
+        "deliverymanId",
+        "deliverymanName",
+        "createdAt",
+        "createdBy",
+        "orders",
+        "items",
+        "totalOrderedAmount",
+        "totalDeliveredAmount",
+        "totalReturnCredit",
+        "netFinalPayable",
+        "expectedCashFromWarehouse",
+        "cashSettled"
+      ]
+    },
+    "RTVRecord": {
+      "title": "RTVRecord",
+      "description": "Return-to-manufacturer damaged goods debit note",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "debitNoteNo": { "type": "string", "maxLength": 64 },
+        "manufacturerName": { "type": "string", "maxLength": 160 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "createdBy": { "type": "string", "maxLength": 120 },
+        "items": { "type": "array" },
+        "totalClaimAmount": { "type": "number" }
+      },
+      "required": ["id", "debitNoteNo", "manufacturerName", "createdAt", "createdBy", "items", "totalClaimAmount"]
+    },
+    "CashbookEntry": {
+      "title": "CashbookEntry",
+      "description": "Cashier treasury cashbook inflow/outflow ledger entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "type": { "type": "string", "enum": ["INFLOW", "OUTFLOW"] },
+        "category": {
+          "type": "string",
+          "enum": ["DELIVERY_SETTLEMENT", "DUE_COLLECTION", "FUEL_EXPENSE", "OTHER_EXPENSE"]
+        },
+        "description": { "type": "string", "maxLength": 300 },
+        "referenceId": { "type": "string", "maxLength": 128 },
+        "amount": { "type": "number" },
+        "recordedBy": { "type": "string", "maxLength": 120 },
+        "deliverymanId": { "type": "string", "maxLength": 128 },
+        "storeId": { "type": "string", "maxLength": 128 },
+        "variance": { "type": "number" }
+      },
+      "required": ["id", "timestamp", "type", "category", "description", "amount", "recordedBy"]
+    },
+    "SettlementRecord": {
+      "title": "SettlementRecord",
+      "description": "Cashier settlement record against deliveryman cash handover",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "deliverymanId": { "type": "string", "maxLength": 128 },
+        "deliverymanName": { "type": "string", "maxLength": 120 },
+        "settledAt": { "type": "string", "maxLength": 64 },
+        "settledBy": { "type": "string", "maxLength": 120 },
+        "finalInvoiceId": { "type": "string", "maxLength": 128 },
+        "finalInvoiceNumber": { "type": "string", "maxLength": 64 },
+        "orderIds": { "type": "array" },
+        "expectedCash": { "type": "number" },
+        "physicalCash": { "type": "number" },
+        "variance": { "type": "number" }
+      },
+      "required": [
+        "id",
+        "deliverymanId",
+        "deliverymanName",
+        "settledAt",
+        "settledBy",
+        "orderIds",
+        "expectedCash",
+        "physicalCash",
+        "variance"
+      ]
+    },
+    "DayLockRecord": {
+      "title": "DayLockRecord",
+      "description": "Operational day close and Admin 1-hour unlock window record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userName": { "type": "string", "maxLength": 120 },
+        "userRole": {
+          "type": "string",
+          "enum": ["ADMIN", "CASHIER", "WAREHOUSE_MANAGER", "SALES_REP", "DELIVERYMAN"]
+        },
+        "dateKey": { "type": "string", "maxLength": 32 },
+        "finishedAt": { "type": "string", "maxLength": 64 },
+        "unlockedUntil": { "type": "string", "maxLength": 64 },
+        "unlockedBy": { "type": "string", "maxLength": 120 }
+      },
+      "required": ["id", "userId", "userName", "userRole", "dateKey"]
+    },
+    "DMSSettings": {
+      "title": "DMSSettings",
+      "description": "Global aerofiy DMS configuration (categories, company profile, A5 print template)",
+      "type": "object",
+      "properties": {
+        "productCategories": { "type": "array" },
+        "companyProfile": { "type": "object" },
+        "printTemplate": {
+          "type": "string",
+          "enum": ["CLASSIC_LEDGER", "MODERN_EMERALD", "COMPACT_THERMAL_A5"]
+        },
+        "initialized": { "type": "boolean" }
+      },
+      "required": ["productCategories", "companyProfile", "printTemplate"]
+    }
+  },
+  "firestore": {
+    "/dms_users/{userId}": {
+      "schema": { "$ref": "#/entities/StaffUser" },
+      "description": "Staff accounts synchronized in real time across all browsers and mobile apps"
+    },
+    "/dms_products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Product catalog and 3-bucket stock counts"
+    },
+    "/dms_stores/{storeId}": {
+      "schema": { "$ref": "#/entities/RetailStore" },
+      "description": "Retail stores with GPS coordinates and due balances"
+    },
+    "/dms_orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Sales orders and delivery statuses"
+    },
+    "/dms_grns/{grnId}": {
+      "schema": { "$ref": "#/entities/GRNRecord" },
+      "description": "Inbound manufacturer GRN receipts with invoice pictures"
+    },
+    "/dms_reconciliations/{reconciliationId}": {
+      "schema": { "$ref": "#/entities/ReconciliationRecord" },
+      "description": "Route return reconciliation records"
+    },
+    "/dms_final_invoices/{invoiceId}": {
+      "schema": { "$ref": "#/entities/FinalInvoice" },
+      "description": "Final route invoices issued from Warehouse to Cashier"
+    },
+    "/dms_rtvs/{rtvId}": {
+      "schema": { "$ref": "#/entities/RTVRecord" },
+      "description": "Return-to-manufacturer damaged goods debit notes"
+    },
+    "/dms_cashbook/{entryId}": {
+      "schema": { "$ref": "#/entities/CashbookEntry" },
+      "description": "Cashier cashbook inflows and outflows"
+    },
+    "/dms_settlements/{settlementId}": {
+      "schema": { "$ref": "#/entities/SettlementRecord" },
+      "description": "Cashier deliveryman cash settlement logs"
+    },
+    "/dms_day_locks/{lockId}": {
+      "schema": { "$ref": "#/entities/DayLockRecord" },
+      "description": "Daily close locks and 1-hour admin unlock records"
+    },
+    "/dms_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/DMSSettings" },
+      "description": "Company branding, categories, and print template settings"
+    }
+  }
+}

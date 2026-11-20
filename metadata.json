@@ -1,0 +1,10 @@
+{
+  "name": "Meridian DMS",
+  "description": "Production Distribution Management System with 3-bucket inventory ledger, OpenStreetMap geo-routing, and role-based fulfillment and cash settlement.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

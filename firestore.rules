@@ -1,0 +1,431 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net — default deny all unmatched paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Shared validation primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isStr(val, maxLen) {
+      return val is string && val.size() <= maxLen;
+    }
+
+    function isNonEmptyStr(val, maxLen) {
+      return val is string && val.size() >= 1 && val.size() <= maxLen;
+    }
+
+    function isOptStr(data, field, maxLen) {
+      return !(field in data) || data[field] == null || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isOptNum(data, field) {
+      return !(field in data) || data[field] == null || data[field] is number;
+    }
+
+    function isNonNegNum(val) {
+      return val is number && val >= 0;
+    }
+
+    function isValidRole(role) {
+      return role in ['ADMIN', 'CASHIER', 'WAREHOUSE_MANAGER', 'SALES_REP', 'DELIVERYMAN'];
+    }
+
+    function isValidOrderStatus(status) {
+      return status in ['PENDING_DISPATCH', 'IN_TRANSIT', 'DELIVERED', 'PARTIAL_DELIVERY'];
+    }
+
+    function isValidCashbookCategory(cat) {
+      return cat in ['DELIVERY_SETTLEMENT', 'DUE_COLLECTION', 'FUEL_EXPENSE', 'OTHER_EXPENSE'];
+    }
+
+    function isValidPrintTemplate(tpl) {
+      return tpl in ['CLASSIC_LEDGER', 'MODERN_EMERALD', 'COMPACT_THERMAL_A5'];
+    }
+
+    // 1. StaffUser validation blueprint
+    function isValidStaffUser(data, docId) {
+      return data.keys().hasAll(['id', 'username', 'password', 'name', 'email', 'phone', 'role', 'active']) &&
+        data.keys().hasOnly(['id', 'username', 'password', 'name', 'email', 'phone', 'role', 'active', 'territory', 'vehicleNo']) &&
+        data.id == docId &&
+        isValidId(data.id) &&
+        isNonEmptyStr(data.username, 64) &&
+        data.password is string && data.password.size() >= 3 && data.password.size() <= 128 &&
+        isNonEmptyStr(data.name, 120) &&
+        isStr(data.email, 160) &&
+        isStr(data.phone, 40) &&
+        isValidRole(data.role) &&
+        data.active is bool &&
+        isOptStr(data, 'territory', 120) &&
+        isOptStr(data, 'vehicleNo', 64);
+    }
+
+    // 2. Product validation blueprint
+    function isValidProduct(data, docId) {
+      return data.keys().hasAll([
+          'id', 'sku', 'name', 'category', 'unit',
+          'unitCost', 'sellingPrice', 'sellableStock', 'inTransitStock', 'damagedStock'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'sku', 'name', 'category', 'unit',
+          'unitCost', 'sellingPrice', 'sellableStock', 'inTransitStock', 'damagedStock'
+        ]) &&
+        data.id == docId &&
+        isValidId(data.id) &&
+        isNonEmptyStr(data.sku, 64) &&
+        isNonEmptyStr(data.name, 160) &&
+        isStr(data.category, 80) &&
+        isNonEmptyStr(data.unit, 40) &&
+        isNonNegNum(data.unitCost) &&
+        isNonNegNum(data.sellingPrice) &&
+        isNonNegNum(data.sellableStock) &&
+        isNonNegNum(data.inTransitStock) &&
+        isNonNegNum(data.damagedStock);
+    }
+
+    // 3. RetailStore validation blueprint
+    function isValidStore(data, docId) {
+      return data.keys().hasAll(['id', 'name', 'ownerName', 'phone', 'address', 'zone', 'creditBalance', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'name', 'ownerName', 'phone', 'address', 'zone', 'lat', 'lng', 'creditBalance', 'createdAt']) &&
+        data.id == docId &&
+        isValidId(data.id) &&
+        isNonEmptyStr(data.name, 160) &&
+        isStr(data.ownerName, 120) &&
+        isStr(data.phone, 40) &&
+        isStr(data.address, 300) &&
+        isStr(data.zone, 80) &&
+        isOptNum(data, 'lat') &&
+        isOptNum(data, 'lng') &&
+        isNonNegNum(data.creditBalance) &&
+        isNonEmptyStr(data.createdAt, 64);
+    }
+
+    // 4. Order validation blueprint
+    function isValidOrder(data, docId) {
+      return data.keys().hasAll([
+          'id', 'orderNumber', 'storeId', 'storeName', 'salesRepId', 'salesRepName',
+          'createdAt', 'status', 'items', 'totalOrderedAmount', 'returnCreditAmount',
+          'netPayableAmount', 'cashCollected', 'dueAdded', 'reconciled', 'cashSettled'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'orderNumber', 'storeId', 'storeName', 'salesRepId', 'salesRepName',
+          'deliverymanId', 'deliverymanName', 'createdAt', 'dispatchedAt', 'deliveredAt',
+          'status', 'items', 'totalOrderedAmount', 'returnCreditAmount', 'netPayableAmount',
+          'cashCollected', 'dueAdded', 'reconciled', 'cashSettled', 'finalInvoiceId', 'finalInvoiceNumber'
+        ]) &&
+        data.id == docId &&
+        isValidId(data.id) &&
+        isNonEmptyStr(data.orderNumber, 64) &&
+        isValidId(data.storeId) &&
+        isStr(data.storeName, 160) &&
+        isValidId(data.salesRepId) &&
+        isStr(data.salesRepName, 120) &&
+        isOptStr(data, 'deliverymanId', 128) &&
+        isOptStr(data, 'deliverymanName', 120) &&
+        isNonEmptyStr(data.createdAt, 64) &&
+        isOptStr(data, 'dispatchedAt', 64) &&
+        isOptStr(data, 'deliveredAt', 64) &&
+        isValidOrderStatus(data.status) &&
+        data.items is list && data.items.size() <= 200 &&
+        isNonNegNum(data.totalOrderedAmount) &&
+        isNonNegNum(data.returnCreditAmount) &&
+        isNonNegNum(data.netPayableAmount) &&
+        isNonNegNum(data.cashCollected) &&
+        isNonNegNum(data.dueAdded) &&
+        data.reconciled is bool &&
+        data.cashSettled is bool &&
+        isOptStr(data, 'finalInvoiceId', 128) &&
+        isOptStr(data, 'finalInvoiceNumber', 64);
+    }
+
+    // 5. GRNRecord validation blueprint
+    function isValidGRN(data, docId) {
+      return data.keys().hasAll(['id', 'referenceNo', 'supplierName', 'receivedAt', 'receivedBy', 'items', 'totalValue']) &&
+        data.keys().hasOnly([
+          'id', 'referenceNo', 'supplierName', 'receivedAt', 'receivedBy',
+          'items', 'totalValue', 'invoiceImageDataUrl', 'invoiceImageName'
+        ]) &&
+        data.id == docId &&
+        isValidId(data.id) &&
+        isNonEmptyStr(data.referenceNo, 80) &&
+        isNonEmptyStr(data.supplierName, 160) &&
+        isNonEmptyStr(data.receivedAt, 64) &&
+        isNonEmptyStr(data.receivedBy, 120) &&
+        data.items is list && data.items.size() <= 200 &&
+        isNonNegNum(data.totalValue) &&
+        isOptStr(data, 'invoiceImageDataUrl', 600000) &&
+        isOptStr(data, 'invoiceImageName', 160);
+    }
+
+    // 6. ReconciliationRecord validation blueprint
+    function isValidReconciliation(data, docId) {
+      return data.keys().hasAll([
+          'id', 'deliverymanId', 'deliverymanName', 'reconciledAt', 'reconciledBy',
+          'orderIds', 'finalInvoiceId', 'finalInvoiceNumber', 'items'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'deliverymanId', 'deliverymanName', 'reconciledAt', 'reconciledBy',
+          'orderIds', 'finalInvoiceId', 'finalInvoiceNumber', 'items'
+        ]) &&
+        data.id == docId &&
+        isValidId(data.id) &&
+        isValidId(data.deliverymanId) &&
+        isNonEmptyStr(data.deliverymanName, 120) &&
+        isNonEmptyStr(data.reconciledAt, 64) &&
+        isNonEmptyStr(data.reconciledBy, 120) &&
+        data.orderIds is list && data.orderIds.size() <= 200 &&
+        isValidId(data.finalInvoiceId) &&
+        isNonEmptyStr(data.finalInvoiceNumber, 64) &&
+        data.items is list && data.items.size() <= 200;
+    }
+
+    // 7. FinalInvoice validation blueprint
+    function isValidFinalInvoice(data, docId) {
+      return data.keys().hasAll([
+          'id', 'invoiceNumber', 'reconciliationId', 'deliverymanId', 'deliverymanName',
+          'createdAt', 'createdBy', 'orders', 'items', 'totalOrderedAmount',
+          'totalDeliveredAmount', 'totalReturnCredit', 'netFinalPayable',
+          'expectedCashFromWarehouse', 'cashSettled'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'invoiceNumber', 'reconciliationId', 'deliverymanId', 'deliverymanName',
+          'createdAt', 'createdBy', 'orders', 'items', 'totalOrderedAmount',
+          'totalDeliveredAmount', 'totalReturnCredit', 'netFinalPayable',
+          'expectedCashFromWarehouse', 'cashSettled', 'cashReceivedByCashier',
+          'variance', 'settledAt', 'settledBy', 'settlementDueDateKey',
+          'rescheduledReason', 'rescheduledBy', 'rescheduledAt'
+        ]) &&
+        data.id == docId &&
+        isValidId(data.id) &&
+        isNonEmptyStr(data.invoiceNumber, 64) &&
+        isValidId(data.reconciliationId) &&
+        isValidId(data.deliverymanId) &&
+        isNonEmptyStr(data.deliverymanName, 120) &&
+        isNonEmptyStr(data.createdAt, 64) &&
+        isNonEmptyStr(data.createdBy, 120) &&
+        data.orders is list && data.orders.size() <= 200 &&
+        data.items is list && data.items.size() <= 200 &&
+        isNonNegNum(data.totalOrderedAmount) &&
+        isNonNegNum(data.totalDeliveredAmount) &&
+        isNonNegNum(data.totalReturnCredit) &&
+        isNonNegNum(data.netFinalPayable) &&
+        isNonNegNum(data.expectedCashFromWarehouse) &&
+        data.cashSettled is bool &&
+        isOptNum(data, 'cashReceivedByCashier') &&
+        isOptNum(data, 'variance') &&
+        isOptStr(data, 'settledAt', 64) &&
+        isOptStr(data, 'settledBy', 120) &&
+        isOptStr(data, 'settlementDueDateKey', 32) &&
+        isOptStr(data, 'rescheduledReason', 240) &&
+        isOptStr(data, 'rescheduledBy', 120) &&
+        isOptStr(data, 'rescheduledAt', 64);
+    }
+
+    // 8. RTVRecord validation blueprint
+    function isValidRTV(data, docId) {
+      return data.keys().hasAll(['id', 'debitNoteNo', 'manufacturerName', 'createdAt', 'createdBy', 'items', 'totalClaimAmount']) &&
+        data.keys().hasOnly(['id', 'debitNoteNo', 'manufacturerName', 'createdAt', 'createdBy', 'items', 'totalClaimAmount']) &&
+        data.id == docId &&
+        isValidId(data.id) &&
+        isNonEmptyStr(data.debitNoteNo, 64) &&
+        isNonEmptyStr(data.manufacturerName, 160) &&
+        isNonEmptyStr(data.createdAt, 64) &&
+        isNonEmptyStr(data.createdBy, 120) &&
+        data.items is list && data.items.size() <= 200 &&
+        isNonNegNum(data.totalClaimAmount);
+    }
+
+    // 9. CashbookEntry validation blueprint
+    function isValidCashbookEntry(data, docId) {
+      return data.keys().hasAll(['id', 'timestamp', 'type', 'category', 'description', 'amount', 'recordedBy']) &&
+        data.keys().hasOnly([
+          'id', 'timestamp', 'type', 'category', 'description', 'referenceId',
+          'amount', 'recordedBy', 'deliverymanId', 'storeId', 'variance'
+        ]) &&
+        data.id == docId &&
+        isValidId(data.id) &&
+        isNonEmptyStr(data.timestamp, 64) &&
+        data.type in ['INFLOW', 'OUTFLOW'] &&
+        isValidCashbookCategory(data.category) &&
+        isNonEmptyStr(data.description, 300) &&
+        isOptStr(data, 'referenceId', 128) &&
+        data.amount is number && data.amount >= 0 &&
+        isNonEmptyStr(data.recordedBy, 120) &&
+        isOptStr(data, 'deliverymanId', 128) &&
+        isOptStr(data, 'storeId', 128) &&
+        isOptNum(data, 'variance');
+    }
+
+    // 10. SettlementRecord validation blueprint
+    function isValidSettlement(data, docId) {
+      return data.keys().hasAll([
+          'id', 'deliverymanId', 'deliverymanName', 'settledAt', 'settledBy',
+          'orderIds', 'expectedCash', 'physicalCash', 'variance'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'deliverymanId', 'deliverymanName', 'settledAt', 'settledBy',
+          'finalInvoiceId', 'finalInvoiceNumber', 'orderIds',
+          'expectedCash', 'physicalCash', 'variance'
+        ]) &&
+        data.id == docId &&
+        isValidId(data.id) &&
+        isValidId(data.deliverymanId) &&
+        isNonEmptyStr(data.deliverymanName, 120) &&
+        isNonEmptyStr(data.settledAt, 64) &&
+        isNonEmptyStr(data.settledBy, 120) &&
+        isOptStr(data, 'finalInvoiceId', 128) &&
+        isOptStr(data, 'finalInvoiceNumber', 64) &&
+        data.orderIds is list && data.orderIds.size() <= 200 &&
+        isNonNegNum(data.expectedCash) &&
+        isNonNegNum(data.physicalCash) &&
+        data.variance is number;
+    }
+
+    // 11. DayLockRecord validation blueprint
+    function isValidDayLock(data, docId) {
+      return data.keys().hasAll(['id', 'userId', 'userName', 'userRole', 'dateKey']) &&
+        data.keys().hasOnly(['id', 'userId', 'userName', 'userRole', 'dateKey', 'finishedAt', 'unlockedUntil', 'unlockedBy']) &&
+        data.id == docId &&
+        isValidId(data.id) &&
+        isValidId(data.userId) &&
+        isNonEmptyStr(data.userName, 120) &&
+        isValidRole(data.userRole) &&
+        isNonEmptyStr(data.dateKey, 32) &&
+        isOptStr(data, 'finishedAt', 64) &&
+        isOptStr(data, 'unlockedUntil', 64) &&
+        isOptStr(data, 'unlockedBy', 120);
+    }
+
+    // 12. DMSSettings validation blueprint
+    function isValidCompanyProfile(cp) {
+      return cp is map &&
+        cp.keys().hasAll(['companyName', 'address', 'phone', 'email']) &&
+        cp.keys().hasOnly(['companyName', 'logoDataUrl', 'address', 'phone', 'email', 'website']) &&
+        isStr(cp.companyName, 160) &&
+        isOptStr(cp, 'logoDataUrl', 350000) &&
+        isStr(cp.address, 300) &&
+        isStr(cp.phone, 60) &&
+        isStr(cp.email, 160) &&
+        isOptStr(cp, 'website', 160);
+    }
+
+    function isValidSettings(data) {
+      return data.keys().hasAll(['productCategories', 'companyProfile', 'printTemplate']) &&
+        data.keys().hasOnly(['productCategories', 'companyProfile', 'printTemplate', 'initialized']) &&
+        data.productCategories is list && data.productCategories.size() <= 200 &&
+        isValidCompanyProfile(data.companyProfile) &&
+        isValidPrintTemplate(data.printTemplate) &&
+        (!('initialized' in data) || data.initialized is bool);
+    }
+
+    // Collection Rules
+    match /dms_users/{userId} {
+      allow get: if isValidId(userId);
+      allow list: if resource.data.id >= '';
+      allow create: if isValidId(userId) && isValidStaffUser(incoming(), userId);
+      allow update: if isValidId(userId) && isValidStaffUser(incoming(), userId) && incoming().id == existing().id;
+      allow delete: if isValidId(userId);
+    }
+
+    match /dms_products/{productId} {
+      allow get: if isValidId(productId);
+      allow list: if resource.data.id >= '';
+      allow create: if isValidId(productId) && isValidProduct(incoming(), productId);
+      allow update: if isValidId(productId) && isValidProduct(incoming(), productId) && incoming().id == existing().id;
+      allow delete: if isValidId(productId);
+    }
+
+    match /dms_stores/{storeId} {
+      allow get: if isValidId(storeId);
+      allow list: if resource.data.id >= '';
+      allow create: if isValidId(storeId) && isValidStore(incoming(), storeId);
+      allow update: if isValidId(storeId) && isValidStore(incoming(), storeId) && incoming().id == existing().id;
+      allow delete: if isValidId(storeId);
+    }
+
+    match /dms_orders/{orderId} {
+      allow get: if isValidId(orderId);
+      allow list: if resource.data.id >= '';
+      allow create: if isValidId(orderId) && isValidOrder(incoming(), orderId);
+      allow update: if isValidId(orderId) && isValidOrder(incoming(), orderId) && incoming().id == existing().id;
+      allow delete: if isValidId(orderId);
+    }
+
+    match /dms_grns/{grnId} {
+      allow get: if isValidId(grnId);
+      allow list: if resource.data.id >= '';
+      allow create: if isValidId(grnId) && isValidGRN(incoming(), grnId);
+      allow update: if isValidId(grnId) && isValidGRN(incoming(), grnId) && incoming().id == existing().id;
+      allow delete: if isValidId(grnId);
+    }
+
+    match /dms_reconciliations/{reconciliationId} {
+      allow get: if isValidId(reconciliationId);
+      allow list: if resource.data.id >= '';
+      allow create: if isValidId(reconciliationId) && isValidReconciliation(incoming(), reconciliationId);
+      allow update: if isValidId(reconciliationId) && isValidReconciliation(incoming(), reconciliationId) && incoming().id == existing().id;
+      allow delete: if isValidId(reconciliationId);
+    }
+
+    match /dms_final_invoices/{invoiceId} {
+      allow get: if isValidId(invoiceId);
+      allow list: if resource.data.id >= '';
+      allow create: if isValidId(invoiceId) && isValidFinalInvoice(incoming(), invoiceId);
+      allow update: if isValidId(invoiceId) && isValidFinalInvoice(incoming(), invoiceId) && incoming().id == existing().id;
+      allow delete: if isValidId(invoiceId);
+    }
+
+    match /dms_rtvs/{rtvId} {
+      allow get: if isValidId(rtvId);
+      allow list: if resource.data.id >= '';
+      allow create: if isValidId(rtvId) && isValidRTV(incoming(), rtvId);
+      allow update: if isValidId(rtvId) && isValidRTV(incoming(), rtvId) && incoming().id == existing().id;
+      allow delete: if isValidId(rtvId);
+    }
+
+    match /dms_cashbook/{entryId} {
+      allow get: if isValidId(entryId);
+      allow list: if resource.data.id >= '';
+      allow create: if isValidId(entryId) && isValidCashbookEntry(incoming(), entryId);
+      allow update: if isValidId(entryId) && isValidCashbookEntry(incoming(), entryId) && incoming().id == existing().id;
+      allow delete: if isValidId(entryId);
+    }
+
+    match /dms_settlements/{settlementId} {
+      allow get: if isValidId(settlementId);
+      allow list: if resource.data.id >= '';
+      allow create: if isValidId(settlementId) && isValidSettlement(incoming(), settlementId);
+      allow update: if isValidId(settlementId) && isValidSettlement(incoming(), settlementId) && incoming().id == existing().id;
+      allow delete: if isValidId(settlementId);
+    }
+
+    match /dms_day_locks/{lockId} {
+      allow get: if isValidId(lockId);
+      allow list: if resource.data.id >= '';
+      allow create: if isValidId(lockId) && isValidDayLock(incoming(), lockId);
+      allow update: if isValidId(lockId) && isValidDayLock(incoming(), lockId) && incoming().id == existing().id;
+      allow delete: if isValidId(lockId);
+    }
+
+    match /dms_settings/{settingId} {
+      allow get: if settingId == 'main';
+      allow list: if false;
+      allow create, update: if settingId == 'main' && isValidSettings(incoming());
+      allow delete: if false;
+    }
+  }
+}

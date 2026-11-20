@@ -1,0 +1,8 @@
+---
+# Optional alternative if you use cPanel -> Git Version Control instead of GitHub Actions FTP.
+# Replace YOUR_CPANEL_USERNAME below with your real cPanel username before using cPanel Git Pull.
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/YOUR_CPANEL_USERNAME/dms.aerofiy.com/
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/cp -rf cpanel-deploy/dms.aerofiy.com/. $DEPLOYPATH

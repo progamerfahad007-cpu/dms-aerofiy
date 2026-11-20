@@ -1,0 +1,60 @@
+name: Auto-Deploy aerofiy DMS to cPanel (dms.aerofiy.com)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dms-aerofiy-com
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy to dms.aerofiy.com
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build production bundle for dms.aerofiy.com
+        run: npm run build
+
+      - name: Verify production output & signed APKs
+        run: |
+          test -f cpanel-deploy/dms.aerofiy.com/index.html
+          test -f cpanel-deploy/dms.aerofiy.com/.htaccess
+          test -f cpanel-deploy/dms.aerofiy.com/aerofiy-salesman-app.apk
+          test -f cpanel-deploy/dms.aerofiy.com/aerofiy-distribution-manager-app.apk
+          test -f cpanel-deploy/dms.aerofiy.com/aerofiy-field-app.apk
+          ls -la cpanel-deploy/dms.aerofiy.com/
+
+      - name: Sync files to cPanel via FTP/FTPS (Zero Firestore Data Impact)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.CPANEL_FTP_SERVER }}
+          username: ${{ secrets.CPANEL_FTP_USERNAME }}
+          password: ${{ secrets.CPANEL_FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./cpanel-deploy/dms.aerofiy.com/
+          server-dir: ${{ secrets.CPANEL_FTP_SERVER_DIR || './' }}
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.well-known/**
+            **/cgi-bin/**
+            **/error_log
+            **/dms-aerofiy-com-cpanel.zip
