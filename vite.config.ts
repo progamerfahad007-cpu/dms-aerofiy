@@ -301,8 +301,7 @@ export default defineConfig(({command}) => {
           ],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
       // Copies src/assets into dist/ so root-relative URLs like
@@ -323,8 +322,9 @@ export default defineConfig(({command}) => {
           }
         },
       },
-      // Packages clean copy-paste cPanel files & ZIP for dms.aerofiy.com + Android Field App ZIP
-      // on every build and serves both downloadable ZIPs in dev mode.
+      // Packages clean cPanel ZIP for dms.aerofiy.com + Android Field App ZIP inside dist/
+      // (so no large build folders clutter the workspace root or slow down GitHub sync)
+      // and serves downloadable ZIPs & APKs in dev mode.
       {
         name: 'cpanel-dms-aerofiy-packager',
         enforce: 'post',
@@ -333,7 +333,7 @@ export default defineConfig(({command}) => {
             const urlPath = req.url ? req.url.split('?')[0] : '';
             if (urlPath === `/${CPANEL_ZIP_NAME}` || urlPath === `/${ANDROID_APP_ZIP_NAME}`) {
               const targetName = urlPath.slice(1);
-              const zipPath = path.resolve(__dirname, 'cpanel-deploy', targetName);
+              const zipPath = path.resolve(__dirname, 'dist', targetName);
               if (fs.existsSync(zipPath)) {
                 const stat = fs.statSync(zipPath);
                 res.statusCode = 200;
@@ -370,33 +370,19 @@ export default defineConfig(({command}) => {
             const distDir = path.resolve(__dirname, 'dist');
             if (!fs.existsSync(distDir)) return;
 
-            const deployRoot = path.resolve(__dirname, 'cpanel-deploy');
-            const subdomainDir = path.join(deployRoot, 'dms.aerofiy.com');
-            fs.rmSync(subdomainDir, {recursive: true, force: true});
-            fs.mkdirSync(subdomainDir, {recursive: true});
-
-            // 1. Build Android Field App (Salesman & Deliveryman only) Capacitor wrapper ZIP
-            //    and place it into dist/ so it is automatically included inside the cPanel ZIP too.
+            // 1. Build Android Field App Capacitor wrapper ZIP into dist/
             const androidZipBuf = buildAndroidFieldProjectZip(__dirname);
-            fs.writeFileSync(path.join(deployRoot, ANDROID_APP_ZIP_NAME), androidZipBuf);
             fs.writeFileSync(path.join(distDir, ANDROID_APP_ZIP_NAME), androidZipBuf);
 
-            // 2. Collect all dist/ files (including PWA manifest, sw.js, workbox, icons, .htaccess,
-            //    and aerofiy-field-android-app.zip) into dms.aerofiy.com/ and dms-aerofiy-com-cpanel.zip
+            // 2. Package all dist/ files (PWA manifest, sw.js, workbox, icons, .htaccess,
+            //    signed .apk files, and Android wrapper ZIP) into dist/dms-aerofiy-com-cpanel.zip
             const collected = collectFiles(distDir);
-            const zipEntries: {relPath: string; data: Buffer}[] = [];
-
-            for (const item of collected) {
-              const targetFile = path.join(subdomainDir, item.relPath);
-              fs.mkdirSync(path.dirname(targetFile), {recursive: true});
-              const data = fs.readFileSync(item.fullPath);
-              fs.writeFileSync(targetFile, data);
-              zipEntries.push({relPath: item.relPath, data});
-            }
+            const zipEntries: {relPath: string; data: Buffer}[] = collected.map((item) => ({
+              relPath: item.relPath,
+              data: fs.readFileSync(item.fullPath),
+            }));
 
             const zipBuffer = createZipBuffer(zipEntries);
-            const deployZipPath = path.join(deployRoot, CPANEL_ZIP_NAME);
-            fs.writeFileSync(deployZipPath, zipBuffer);
             fs.writeFileSync(path.join(distDir, CPANEL_ZIP_NAME), zipBuffer);
           },
         },

@@ -5,4 +5,4 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home/YOUR_CPANEL_USERNAME/dms.aerofiy.com/
     - /bin/mkdir -p $DEPLOYPATH
-    - /bin/cp -rf cpanel-deploy/dms.aerofiy.com/. $DEPLOYPATH
+    - /bin/cp -rf dist/. $DEPLOYPATH

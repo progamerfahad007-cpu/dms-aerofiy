@@ -33,12 +33,12 @@ jobs:
 
       - name: Verify production output & signed APKs
         run: |
-          test -f cpanel-deploy/dms.aerofiy.com/index.html
-          test -f cpanel-deploy/dms.aerofiy.com/.htaccess
-          test -f cpanel-deploy/dms.aerofiy.com/aerofiy-salesman-app.apk
-          test -f cpanel-deploy/dms.aerofiy.com/aerofiy-distribution-manager-app.apk
-          test -f cpanel-deploy/dms.aerofiy.com/aerofiy-field-app.apk
-          ls -la cpanel-deploy/dms.aerofiy.com/
+          test -f dist/index.html
+          test -f dist/.htaccess
+          test -f dist/aerofiy-salesman-app.apk
+          test -f dist/aerofiy-distribution-manager-app.apk
+          test -f dist/aerofiy-field-app.apk
+          ls -la dist/
 
       - name: Sync files to cPanel via FTP/FTPS (Zero Firestore Data Impact)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -48,7 +48,7 @@ jobs:
           password: ${{ secrets.CPANEL_FTP_PASSWORD }}
           protocol: ftps
           port: 21
-          local-dir: ./cpanel-deploy/dms.aerofiy.com/
+          local-dir: ./dist/
           server-dir: ${{ secrets.CPANEL_FTP_SERVER_DIR || './' }}
           exclude: |
             **/.git*
