@@ -48,7 +48,9 @@ import {
 } from '../common/PrintableDocumentModal';
 import { formatCurrency, formatDateTime, StatusBadge } from '../common/StatusBadge';
 import { DashboardLayout, NavItem } from '../layout/DashboardLayout';
+import { exportCatalogToCsv } from '../../utils/productCsv';
 import { AdminReportsPanel } from './AdminReportsPanel';
+import { BulkProductCsvModal } from './BulkProductCsvModal';
 
 type AdminTab =
   | 'overview'
@@ -80,6 +82,7 @@ export const AdminDashboard: React.FC = () => {
     addProductCategory,
     deleteProductCategory,
     addProduct,
+    bulkImportProducts,
     updateProduct,
     deleteProduct,
     updateProductPrices,
@@ -120,6 +123,7 @@ export const AdminDashboard: React.FC = () => {
 
   // Product modal state
   const [productModalOpen, setProductModalOpen] = useState(false);
+  const [bulkCsvModalOpen, setBulkCsvModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState({
     sku: '',
@@ -465,6 +469,28 @@ export const AdminDashboard: React.FC = () => {
       setFeedback({ type: 'success', text: `Added new product ${res.data?.sku}.` });
       setProductModalOpen(false);
     }
+  };
+
+  const handleBulkImportProducts = (
+    rows: Omit<Product, 'id' | 'inTransitStock' | 'damagedStock'>[],
+    duplicateMode: 'UPDATE' | 'SKIP'
+  ) => {
+    const res = bulkImportProducts(rows, duplicateMode);
+    if (!res.ok || !res.data) {
+      return res;
+    }
+    const { added, updated, skipped, categoriesAdded } = res.data;
+    const parts: string[] = [];
+    if (added > 0) parts.push(`${added} added`);
+    if (updated > 0) parts.push(`${updated} updated`);
+    if (skipped > 0) parts.push(`${skipped} skipped`);
+    if (categoriesAdded > 0) parts.push(`${categoriesAdded} new categor${categoriesAdded === 1 ? 'y' : 'ies'} created`);
+    setPriceDrafts({});
+    setFeedback({
+      type: 'success',
+      text: `Bulk CSV import complete: ${parts.join(', ')} — synced live across all devices.`,
+    });
+    return res;
   };
 
   const handleInlinePriceSave = (p: Product) => {
@@ -1484,14 +1510,34 @@ export const AdminDashboard: React.FC = () => {
                   SKU editor
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={openAddProduct}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                Add Product
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {state.products.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => exportCatalogToCsv(state.products)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export CSV
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setBulkCsvModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Bulk Upload CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={openAddProduct}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Product
+                </button>
+              </div>
             </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
@@ -1512,8 +1558,8 @@ export const AdminDashboard: React.FC = () => {
                 {state.products.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-10 px-4 text-center text-slate-500">
-                      No products in catalog yet. Click <strong>Add Product</strong> to create your
-                      first SKU.
+                      No products in catalog yet. Click <strong>Add Product</strong> or{' '}
+                      <strong>Bulk Upload CSV</strong> to import your catalog.
                     </td>
                   </tr>
                 ) : (
@@ -2744,6 +2790,15 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {bulkCsvModalOpen && (
+        <BulkProductCsvModal
+          existingProducts={state.products}
+          existingCategories={state.productCategories}
+          onClose={() => setBulkCsvModalOpen(false)}
+          onImport={handleBulkImportProducts}
+        />
       )}
 
       <PrintableDocumentModal

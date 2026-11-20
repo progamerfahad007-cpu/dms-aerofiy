@@ -114,6 +114,15 @@ interface DMSContextValue {
   addProduct: (
     product: Omit<Product, 'id' | 'inTransitStock' | 'damagedStock'>
   ) => ActionResult<Product>;
+  bulkImportProducts: (
+    rows: Omit<Product, 'id' | 'inTransitStock' | 'damagedStock'>[],
+    duplicateMode: 'UPDATE' | 'SKIP'
+  ) => ActionResult<{
+    added: number;
+    updated: number;
+    skipped: number;
+    categoriesAdded: number;
+  }>;
   updateProduct: (product: Product) => ActionResult;
   deleteProduct: (productId: string) => ActionResult;
   updateProductPrices: (
@@ -1050,6 +1059,117 @@ export const DMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { ok: true, data: newProduct };
   };
 
+  const bulkImportProducts = (
+    rows: Omit<Product, 'id' | 'inTransitStock' | 'damagedStock'>[],
+    duplicateMode: 'UPDATE' | 'SKIP'
+  ): ActionResult<{
+    added: number;
+    updated: number;
+    skipped: number;
+    categoriesAdded: number;
+  }> => {
+    if (!currentUser || currentUser.role !== 'ADMIN') {
+      return { ok: false, error: 'Only Admin can bulk upload products.' };
+    }
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return { ok: false, error: 'No valid product rows found to import.' };
+    }
+
+    const existingBySku = new Map<string, Product>(
+      stateRef.current.products.map((p) => [p.sku.trim().toUpperCase(), p])
+    );
+    const updatedProducts = [...stateRef.current.products];
+    const indexBySku = new Map<string, number>(
+      updatedProducts.map((p, idx) => [p.sku.trim().toUpperCase(), idx])
+    );
+    const nextCategories = [...stateRef.current.productCategories];
+    const existingCatLower = new Set(nextCategories.map((c) => c.trim().toLowerCase()));
+
+    let added = 0;
+    let updated = 0;
+    let skipped = 0;
+    let categoriesAdded = 0;
+
+    rows.forEach((row, idx) => {
+      const cleanSku = (row.sku || '').trim().toUpperCase().slice(0, 64);
+      const cleanName = (row.name || '').trim().slice(0, 160);
+      if (!cleanSku || !cleanName) {
+        skipped++;
+        return;
+      }
+
+      const cleanCategory = (row.category || '').trim().slice(0, 80);
+      const cleanUnit = (row.unit || 'Unit').trim().slice(0, 40) || 'Unit';
+      const unitCost = Number(Math.max(0, Number(row.unitCost) || 0).toFixed(2));
+      const sellingPrice = Number(Math.max(0, Number(row.sellingPrice) || 0).toFixed(2));
+      const sellableStock = Math.max(0, Math.floor(Number(row.sellableStock) || 0));
+
+      const existing = existingBySku.get(cleanSku);
+      if (existing) {
+        if (duplicateMode === 'SKIP') {
+          skipped++;
+          return;
+        }
+        const existingIdx = indexBySku.get(cleanSku);
+        if (existingIdx !== undefined) {
+          updatedProducts[existingIdx] = {
+            ...existing,
+            sku: cleanSku,
+            name: cleanName,
+            category: cleanCategory || existing.category,
+            unit: cleanUnit,
+            unitCost,
+            sellingPrice,
+            sellableStock,
+          };
+          updated++;
+        }
+      } else {
+        const newProduct: Product = {
+          id: makeDocId(`prod-${idx}`),
+          sku: cleanSku,
+          name: cleanName,
+          category: cleanCategory,
+          unit: cleanUnit,
+          unitCost,
+          sellingPrice,
+          sellableStock,
+          inTransitStock: 0,
+          damagedStock: 0,
+        };
+        indexBySku.set(cleanSku, updatedProducts.length);
+        existingBySku.set(cleanSku, newProduct);
+        updatedProducts.push(newProduct);
+        added++;
+      }
+
+      if (
+        cleanCategory &&
+        !existingCatLower.has(cleanCategory.toLowerCase()) &&
+        nextCategories.length < 200
+      ) {
+        existingCatLower.add(cleanCategory.toLowerCase());
+        nextCategories.push(cleanCategory);
+        categoriesAdded++;
+      }
+    });
+
+    if (added === 0 && updated === 0) {
+      return {
+        ok: false,
+        error: 'No products were imported (all rows were skipped or already exist).',
+      };
+    }
+
+    mutateState((prev) => ({
+      ...prev,
+      products: updatedProducts,
+      productCategories: nextCategories,
+    }));
+
+    return { ok: true, data: { added, updated, skipped, categoriesAdded } };
+  };
+
   const updateProduct = (updated: Product): ActionResult => {
     const cleanSku = updated.sku.trim().toUpperCase();
     const cleanName = updated.name.trim();
@@ -1953,6 +2073,7 @@ export const DMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addProductCategory,
         deleteProductCategory,
         addProduct,
+        bulkImportProducts,
         updateProduct,
         deleteProduct,
         updateProductPrices,
